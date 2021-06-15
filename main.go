@@ -16,19 +16,14 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// TODO: UNDERSTAND LOGIC PROPERLY
 func main() {
 	fmt.Println("Starting service..")
 
-	// var urls []string
-	// var allSources []string
-
 	// read urls
-	urls, err := readFile("test-urls.txt")
+	urls, err := readFile("urls.txt")
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("read lines:")
 	// getting js source file
 	for _, u := range urls {
 		fmt.Println("getting sources:")
@@ -39,7 +34,7 @@ func main() {
 			return
 		}
 
-		sources, err := getScriptSrc(u, "GET", nil, false, 10)
+		sources, err := getScriptSrc(u, "GET", nil, true, 10)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -47,19 +42,27 @@ func main() {
 		fmt.Println("printing sources:")
 
 		for _, source := range sources {
+			fmt.Println(source)
 			filenameURL, err := url.Parse(source)
 			if err != nil {
 				fmt.Println(err)
 			}
+
 			filename := p.Base(filenameURL.Path)
 			if filename == "." {
-				break
+				continue
 			}
+
 			fullpath := filepath.Join("out", path, filename)
 			if strings.HasPrefix(source, "/") {
 				source = u + "/" + filename
 				fmt.Println(fullpath)
 			}
+			fmt.Println(fullpath)
+			if checkFileExists(fullpath) {
+				continue
+			}
+
 			if err := downloadFile(fullpath, source); err != nil {
 				fmt.Println(err)
 				return
@@ -72,6 +75,15 @@ func main() {
 
 }
 
+// checkFileExists checks if file already exists,
+// helps avoiding downloading file, if it already exists
+func checkFileExists(path string) bool {
+	if _, err := os.Stat(path); err == nil || os.IsExist(err) {
+		return true
+	}
+	return false
+}
+
 // downloadFile downloads the given url and returns it,
 // to be used by other parts of program
 func downloadFile(path, url string) error {
@@ -80,6 +92,10 @@ func downloadFile(path, url string) error {
 	if err != nil {
 		return err
 	}
+	if res.StatusCode != 200 {
+		return nil
+	}
+
 	defer res.Body.Close()
 
 	// create the file
