@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 	"io"
@@ -38,6 +39,22 @@ var (
 	domainName string
 )
 
+func init() {
+	var filename = "info.log"
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	Formatter := new(log.TextFormatter)
+	Formatter.FullTimestamp = true
+	log.SetFormatter(Formatter)
+	// writes to file and stdout
+	mw := io.MultiWriter(os.Stdout, f)
+	if err != nil {
+		// Cannot open log file. Logging to stderr
+		fmt.Println(err)
+	} else {
+		log.SetOutput(mw)
+	}
+}
+
 func main() {
 	log.Println("Starting service..")
 
@@ -71,8 +88,8 @@ func main() {
 			return
 		}
 
-		if err := createDirector(path); err != nil {
-			log.Error("createDirector: " + err.Error())
+		if err := createDirectory(path); err != nil {
+			log.Error("createDirectory: " + err.Error())
 			return
 		}
 
@@ -96,8 +113,10 @@ func main() {
 			if filename == "." {
 				continue
 			}
-
-			fullpath := filepath.Join("out", path, filename)
+			var fullpath string
+			if domainName != "" {
+				fullpath = filepath.Join("out", domainName, path, filename)
+			}
 			if strings.HasPrefix(source, "/") {
 				source = u + "/" + filename
 				log.Println(fullpath)
@@ -118,9 +137,9 @@ func main() {
 				continue
 			}
 
-			log.Printf("exists?: %t \n", exists)
+			log.Infof("exists?: %t", exists)
 			if exists {
-				log.Info("log: %s \n", "url: "+u+"path: "+fullpath)
+				log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
 				if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
 					log.Error("logToFile: " + err.Error())
 					return
@@ -248,16 +267,16 @@ func standardizeURLForDirectoryName(link string) (string, error) {
 
 // createDirectory for creating directory based on provided name,
 // in our case its url name
-func createDirector(path string) error {
+func createDirectory(path string) error {
 	// create an out directory if it doesn't already exists
 	var outputDirectory string
 	if domainName != "" {
-		outputDirectory = domainName
+		outputDirectory = filepath.Join("out", domainName)
 	}
 	_, err := os.Stat(outputDirectory)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err = os.Mkdir(outputDirectory, 0755); err != nil {
+			if err := os.MkdirAll(outputDirectory, 0755); err != nil {
 				return err
 			}
 		}
@@ -331,7 +350,7 @@ func getScriptSrc(url, method string, headers []string, insecure bool, timeout i
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		log.Error("[!]%s returned an %d instead of %d\n", url, res.StatusCode, http.StatusOK)
+		log.Errorf("[!]%s returned an %d instead of %d", url, res.StatusCode, http.StatusOK)
 		return nil, nil
 	}
 
