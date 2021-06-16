@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -19,43 +18,41 @@ import (
 )
 
 func main() {
-	fmt.Println("Starting service..")
+	log.Println("Starting service..")
 
 	// read urls
 	urls, err := readFile("urls.txt")
 	if err != nil {
-		fmt.Println(err)
+		log.Println("[ERROR] readFile: " + err.Error())
+		return
 	}
 	// getting js source file
 	for _, u := range urls {
-		fmt.Println("getting sources:")
-
-		exists, err := findPackage("sample.js")
+		path, err := standardizeURLForDirectoryName(u)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("[ERROR] standardizeURLForDirectoryName: " + err.Error())
 			return
 		}
-		fmt.Printf("exists?: %t", exists)
-		return
 
-		path, _ := standardizeURLForDirectoryName(u)
 		if err := createDirector(path); err != nil {
-			fmt.Println(err)
+			log.Println("[ERROR] createDirector: " + err.Error())
 			return
 		}
 
 		sources, err := getScriptSrc(u, "GET", nil, true, 10)
 		if err != nil {
-			fmt.Println(err)
+			log.Println("[ERROR] getScriptSrc: " + err.Error())
 		}
 
-		fmt.Println("printing sources:")
-
 		for _, source := range sources {
-			fmt.Println(source)
+			log.Println(source)
 			filenameURL, err := url.Parse(source)
 			if err != nil {
-				fmt.Println(err)
+				log.Println("[ERROR] url.Parse: " + err.Error())
+			}
+
+			if filenameURL == nil {
+				continue
 			}
 
 			filename := p.Base(filenameURL.Path)
@@ -66,16 +63,31 @@ func main() {
 			fullpath := filepath.Join("out", path, filename)
 			if strings.HasPrefix(source, "/") {
 				source = u + "/" + filename
-				fmt.Println(fullpath)
+				log.Println(fullpath)
 			}
-			fmt.Println(fullpath)
+			log.Println(fullpath)
 			if checkFileExists(fullpath) {
 				continue
 			}
 
 			if err := downloadFile(fullpath, source); err != nil {
-				fmt.Println(err)
-				return
+				log.Println("[ERROR] downloadFile: " + err.Error())
+				continue
+			}
+
+			exists, err := findPackage(fullpath)
+			if err != nil {
+				log.Println("[ERROR] findPackage: " + err.Error())
+				continue
+			}
+
+			log.Printf("exists?: %t \n", exists)
+			if exists {
+				log.Printf("log: %s \n", "url: "+u+"path: "+fullpath)
+				if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
+					log.Println("[ERROR] logToFile: " + err.Error())
+					return
+				}
 			}
 		}
 
@@ -104,7 +116,11 @@ func logToFile(message string) error {
 func findPackage(path string) (bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return false, err
+		if os.IsNotExist(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
 	}
 	defer f.Close()
 
@@ -127,7 +143,7 @@ func findPackage(path string) (bool, error) {
 		// line := 1
 		// for scanner.Scan() {
 		// 	text := scanner.Text()
-		// 	fmt.Println(text)
+		// 	log.Println(text)
 		// 	if strings.Contains(text, `"scripts":`) {
 		// 		return true, nil
 		// 	}
@@ -246,7 +262,7 @@ func getScriptSrc(url, method string, headers []string, insecure bool, timeout i
 	for _, d := range headers {
 		values := strings.Split(d, ":")
 		if len(values) == 2 {
-			fmt.Println("[+] New Header: " + values[0] + ": " + values[1])
+			log.Println("[+] New Header: " + values[0] + ": " + values[1])
 			req.Header.Set(values[0], values[1])
 		}
 	}
@@ -268,7 +284,7 @@ func getScriptSrc(url, method string, headers []string, insecure bool, timeout i
 	defer res.Body.Close()
 
 	if res.StatusCode != 200 {
-		fmt.Printf("[!]%s returned an %d instead of %d", url, res.StatusCode, http.StatusOK)
+		log.Printf("[!]%s returned an %d instead of %d\n", url, res.StatusCode, http.StatusOK)
 		return nil, nil
 	}
 
