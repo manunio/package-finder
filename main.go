@@ -37,10 +37,11 @@ type Package struct {
 
 var (
 	domainName string
+	filename   = "info.log"
+	packageLog = "package.log"
 )
 
 func init() {
-	var filename = "info.log"
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	Formatter := new(log.TextFormatter)
 	Formatter.FullTimestamp = true
@@ -175,7 +176,7 @@ func (p *Package) readConfigFile() error {
 // and then logs the given message
 func logToFile(message string) error {
 	// create a log file
-	f, err := os.OpenFile("package.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(packageLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return err
 	}
