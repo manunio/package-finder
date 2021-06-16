@@ -17,6 +17,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// package-finder downloads all javascript files from the given url,
+// stores it, and reads it for private package.json file traces i.e,
+// in our case it searches for "scripts:" in file and then logs useful details to a package.log
+// in-case its found.
 func main() {
 	log.Println("Starting service..")
 
@@ -138,17 +142,6 @@ func findPackage(path string) (bool, error) {
 		if bytes.Contains(buffer[:bytesRead], []byte(`"scripts":`)) {
 			return true, nil
 		}
-
-		// scanner := bufio.NewScanner(f)
-		// line := 1
-		// for scanner.Scan() {
-		// 	text := scanner.Text()
-		// 	log.Println(text)
-		// 	if strings.Contains(text, `"scripts":`) {
-		// 		return true, nil
-		// 	}
-		// }
-		// line++
 	}
 	return false, nil
 }
