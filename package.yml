@@ -1,0 +1,5 @@
+domains:
+  - name: apple
+    urls_file: ./urls.txt
+  - name: shopify
+    urls_file:

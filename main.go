@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"gopkg.in/yaml.v2"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
-	p "path"
+	pa "path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,11 +23,42 @@ import (
 // stores it, and reads it for private package.json file traces i.e,
 // in our case it searches for "scripts:" in file and then logs useful details to a package.log
 // in-case its found.
+
+type Domain struct {
+	Name     string `yaml:"name"`
+	UrlsFile string `yaml:"urls_file"`
+}
+
+type Package struct {
+	Domains    []Domain `yaml:"domains"`
+	ConfigFile []byte
+}
+
+var (
+	domainName string
+)
+
 func main() {
 	log.Println("Starting service..")
 
+	var domainUrlFile string
+
+	p := Package{}
+	if err := p.readConfigFile(); err != nil {
+		log.Println("[ERROR] readConfigFile: " + err.Error())
+		return
+	}
+
+	if p.Domains != nil {
+		for _, d := range p.Domains {
+			if d.Name != "" && d.UrlsFile != "" {
+				domainUrlFile = d.UrlsFile
+				domainName = d.Name
+			}
+		}
+	}
 	// read urls
-	urls, err := readFile("urls.txt")
+	urls, err := readFile(domainUrlFile)
 	if err != nil {
 		log.Println("[ERROR] readFile: " + err.Error())
 		return
@@ -59,7 +92,7 @@ func main() {
 				continue
 			}
 
-			filename := p.Base(filenameURL.Path)
+			filename := pa.Base(filenameURL.Path)
 			if filename == "." {
 				continue
 			}
@@ -99,6 +132,24 @@ func main() {
 
 	return
 
+}
+
+func (p *Package) readConfigFile() error {
+	// ReadFile following statement is useful for reading small files,
+	// 	don't use it for reading large files
+	b, err := ioutil.ReadFile("package.yml")
+	if err != nil {
+		return err
+	}
+	p.ConfigFile = b
+
+	if p.ConfigFile != nil {
+		if err := yaml.Unmarshal(p.ConfigFile, p); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // logToFile creates a file and passes it log.SetOutput,
@@ -199,7 +250,10 @@ func standardizeURLForDirectoryName(link string) (string, error) {
 // in our case its url name
 func createDirector(path string) error {
 	// create an out directory if it doesn't already exists
-	outputDirectory := "out"
+	var outputDirectory string
+	if domainName != "" {
+		outputDirectory = domainName
+	}
 	_, err := os.Stat(outputDirectory)
 	if err != nil {
 		if os.IsNotExist(err) {
