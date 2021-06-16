@@ -2,9 +2,11 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,6 +29,14 @@ func main() {
 	// getting js source file
 	for _, u := range urls {
 		fmt.Println("getting sources:")
+
+		exists, err := findPackage("sample.js")
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("exists?: %t", exists)
+		return
 
 		path, _ := standardizeURLForDirectoryName(u)
 		if err := createDirector(path); err != nil {
@@ -73,6 +83,58 @@ func main() {
 
 	return
 
+}
+
+// logToFile creates a file and passes it log.SetOutput,
+// and then logs the given message
+func logToFile(message string) error {
+	// create a log file
+	f, err := os.OpenFile("package.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	log.SetOutput(f)
+	log.Println(message)
+	return nil
+}
+
+// findPackage finds a string ex:`"scripts": in given file.
+func findPackage(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+
+	const bufferSize = 100
+
+	buffer := make([]byte, bufferSize)
+	for {
+		bytesRead, err := f.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				return false, err
+			}
+			break
+		}
+		if bytes.Contains(buffer[:bytesRead], []byte(`"scripts":`)) {
+			return true, nil
+		}
+
+		// scanner := bufio.NewScanner(f)
+		// line := 1
+		// for scanner.Scan() {
+		// 	text := scanner.Text()
+		// 	fmt.Println(text)
+		// 	if strings.Contains(text, `"scripts":`) {
+		// 		return true, nil
+		// 	}
+		// }
+		// line++
+	}
+	return false, nil
 }
 
 // checkFileExists checks if file already exists,
