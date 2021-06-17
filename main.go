@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -31,18 +32,24 @@ type Domain struct {
 }
 
 type Package struct {
-	Domains    []Domain `yaml:"domains"`
-	ConfigFile []byte
+	Domains        []Domain `yaml:"domains"`
+	OutputRootPath string   `yaml:"output_root_path"`
+	ConfigFile     []byte
 }
 
+const (
+	infoLog    = "/var/log/info.log"
+	packageLog = "/var/log/package.log"
+	packageYml = "/home/maxx/package.yml"
+)
+
 var (
-	domainName string
-	filename   = "info.log"
-	packageLog = "package.log"
+	domainName     string
+	outputRootPath string
 )
 
 func init() {
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	f, err := os.OpenFile(infoLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	Formatter := new(log.TextFormatter)
 	Formatter.FullTimestamp = true
 	log.SetFormatter(Formatter)
@@ -69,9 +76,10 @@ func main() {
 
 	if p.Domains != nil {
 		for _, d := range p.Domains {
-			if d.Name != "" && d.UrlsFile != "" {
+			if d.Name != "" && d.UrlsFile != "" && p.OutputRootPath != "" {
 				domainUrlFile = d.UrlsFile
 				domainName = d.Name
+				outputRootPath = p.OutputRootPath
 			}
 		}
 	}
@@ -116,7 +124,7 @@ func main() {
 			}
 			var fullpath string
 			if domainName != "" {
-				fullpath = filepath.Join("out", domainName, path, filename)
+				fullpath = filepath.Join(outputRootPath, domainName, path, filename)
 			}
 			if strings.HasPrefix(source, "/") {
 				source = u + "/" + filename
@@ -157,7 +165,7 @@ func main() {
 func (p *Package) readConfigFile() error {
 	// ReadFile following statement is useful for reading small files,
 	// 	don't use it for reading large files
-	b, err := ioutil.ReadFile("package.yml")
+	b, err := ioutil.ReadFile(packageYml)
 	if err != nil {
 		return err
 	}
@@ -183,7 +191,7 @@ func logToFile(message string) error {
 	defer f.Close()
 
 	log.SetOutput(f)
-	log.Println(message)
+	log.Info(message)
 	return nil
 }
 
@@ -272,7 +280,7 @@ func createDirectory(path string) error {
 	// create an out directory if it doesn't already exists
 	var outputDirectory string
 	if domainName != "" {
-		outputDirectory = filepath.Join("out", domainName)
+		outputDirectory = filepath.Join(outputRootPath, domainName)
 	}
 	_, err := os.Stat(outputDirectory)
 	if err != nil {

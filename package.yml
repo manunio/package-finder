@@ -3,3 +3,4 @@ domains:
     urls_file: ./urls.txt
   - name: shopify
     urls_file:
+output_root_path: out
