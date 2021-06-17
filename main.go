@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
+	"os/user"
 	pa "path"
 	"path/filepath"
 	"strings"
@@ -34,18 +36,20 @@ type Domain struct {
 type Package struct {
 	Domains        []Domain `yaml:"domains"`
 	OutputRootPath string   `yaml:"output_root_path"`
+	InfoLog        string   `yaml:"info_log"`
+	PackageLog     string   `yaml:"package_log"`
+	PackageYml     string   `yaml:"package_yml"`
 	ConfigFile     []byte
 }
 
-const (
-	infoLog    = "/var/log/info.log"
-	packageLog = "/var/log/package.log"
-	packageYml = "/home/maxx/package.yml"
-)
-
 var (
+	usr, _         = user.Current()
 	domainName     string
 	outputRootPath string
+	infoLog        string
+	packageLog     string
+	domainUrlFile  string
+	packageYml     string
 )
 
 func init() {
@@ -61,28 +65,30 @@ func init() {
 	} else {
 		log.SetOutput(mw)
 	}
+
+	if os.Getenv("MODE") == "prod" {
+		packageYml = filepath.Join(usr.HomeDir, "package.yml")
+	} else {
+		packageYml = "package.yml"
+	}
+
+	p := Package{}
+
+	if err := p.readConfig(); err != nil {
+		log.Error("readConfig: " + err.Error())
+		os.Exit(1)
+	}
+
+	if err := p.validateConfig(); err != nil {
+		log.Error("validateConfig: " + err.Error())
+		os.Exit(1)
+	}
+
 }
 
 func main() {
 	log.Println("Starting service..")
 
-	var domainUrlFile string
-
-	p := Package{}
-	if err := p.readConfigFile(); err != nil {
-		log.Error("readConfigFile: " + err.Error())
-		return
-	}
-
-	if p.Domains != nil {
-		for _, d := range p.Domains {
-			if d.Name != "" && d.UrlsFile != "" && p.OutputRootPath != "" {
-				domainUrlFile = d.UrlsFile
-				domainName = d.Name
-				outputRootPath = p.OutputRootPath
-			}
-		}
-	}
 	// read urls
 	urls, err := readFile(domainUrlFile)
 	if err != nil {
@@ -162,9 +168,35 @@ func main() {
 
 }
 
-func (p *Package) readConfigFile() error {
+// validateConfig validates the package.yml file
+func (p *Package) validateConfig() error {
+	if p.Domains != nil {
+		for _, d := range p.Domains {
+			if d.Name != "" && d.UrlsFile != "" && p.OutputRootPath != "" &&
+				p.InfoLog != "" && p.PackageLog != "" {
+				domainUrlFile = d.UrlsFile
+				domainName = d.Name
+				outputRootPath = p.OutputRootPath
+				infoLog = p.InfoLog
+				packageLog = p.PackageLog
+			} else {
+				return errors.New("package.yml required fields not set")
+			}
+		}
+	}
+	return nil
+}
+
+// readConfig reads the package.yml file,
+// package.yml depends on the environment variable MODE
+// if MODE == "prod", it uses ~/package.yml,
+// and if MODE != "prod" its uses package.yml(relative path)
+func (p *Package) readConfig() error {
 	// ReadFile following statement is useful for reading small files,
 	// 	don't use it for reading large files
+	if p.PackageYml != "" {
+		packageYml = p.PackageYml
+	}
 	b, err := ioutil.ReadFile(packageYml)
 	if err != nil {
 		return err
