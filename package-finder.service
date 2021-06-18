@@ -3,8 +3,9 @@ Description=package-finder for finding package.json packages
 
 [Service]
 Type=simple
+Environment=MODE=prod
 ExecStart=~/dev/golang/package-finder/bin/package-finder
 
 [Install]
-WantedBy=mutli-user.target
+WantedBy=multi-user.target
 

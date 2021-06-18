@@ -23,6 +23,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// TODO: reduce global variables
+// TODO: make goquery request concurrent
+// TODO: handle error defer *.Close() methods
+
 // package-finder downloads all javascript files from the given url,
 // stores it, and reads it for private package.json file traces i.e,
 // in our case it searches for "scripts:" in file and then logs useful details to a package.log
@@ -48,7 +52,6 @@ var (
 	outputRootPath string
 	infoLog        string
 	packageLog     string
-	domainUrlFile  string
 	packageYml     string
 )
 
@@ -89,83 +92,87 @@ func init() {
 func main() {
 	log.Println("Starting service..")
 
-	// read urls
-	urls, err := readFile(domainUrlFile)
-	if err != nil {
-		log.Error("readFile: " + err.Error())
-		return
-	}
-	// getting js source file
-	for _, u := range urls {
-		path, err := standardizeURLForDirectoryName(u)
-		if err != nil {
-			log.Error("standardizeURLForDirectoryName: " + err.Error())
-			return
-		}
-
-		if err := createDirectory(path); err != nil {
-			log.Error("createDirectory: " + err.Error())
-			return
-		}
-
-		sources, err := getScriptSrc(u, "GET", nil, true, 10)
-		if err != nil {
-			log.Error("getScriptSrc: " + err.Error())
-		}
-
-		for _, source := range sources {
-			log.Println(source)
-			filenameURL, err := url.Parse(source)
+	p := Package{}
+	if p.Domains != nil {
+		for _, d := range p.Domains {
+			// read urls
+			// d.UrlsFile is already checked for nil in validateConfig at init()
+			urls, err := readFile(d.UrlsFile)
 			if err != nil {
-				log.Error("url.Parse: " + err.Error())
+				log.Error("readFile: " + err.Error())
+				return
 			}
 
-			if filenameURL == nil {
-				continue
-			}
-
-			filename := pa.Base(filenameURL.Path)
-			if filename == "." {
-				continue
-			}
-			var fullpath string
-			if domainName != "" {
-				fullpath = filepath.Join(outputRootPath, domainName, path, filename)
-			}
-			if strings.HasPrefix(source, "/") {
-				source = u + "/" + filename
-				log.Println(fullpath)
-			}
-			log.Println(fullpath)
-			if checkFileExists(fullpath) {
-				continue
-			}
-
-			if err := downloadFile(fullpath, source); err != nil {
-				log.Error("downloadFile: " + err.Error())
-				continue
-			}
-
-			exists, err := findPackage(fullpath)
-			if err != nil {
-				log.Error("findPackage: " + err.Error())
-				continue
-			}
-
-			log.Infof("exists?: %t", exists)
-			if exists {
-				log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
-				if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
-					log.Error("logToFile: " + err.Error())
+			// getting js source file
+			for _, u := range urls {
+				path, err := standardizeURLForDirectoryName(u)
+				if err != nil {
+					log.Error("standardizeURLForDirectoryName: " + err.Error())
 					return
+				}
+
+				if err := createDirectory(path); err != nil {
+					log.Error("createDirectory: " + err.Error())
+					return
+				}
+
+				sources, err := getScriptSrc(u, "GET", nil, true, 10)
+				if err != nil {
+					log.Error("getScriptSrc: " + err.Error())
+				}
+
+				for _, source := range sources {
+					log.Println(source)
+					filenameURL, err := url.Parse(source)
+					if err != nil {
+						log.Error("url.Parse: " + err.Error())
+					}
+
+					if filenameURL == nil {
+						continue
+					}
+
+					filename := pa.Base(filenameURL.Path)
+					if filename == "." {
+						continue
+					}
+					var fullpath string
+					if domainName != "" {
+						fullpath = filepath.Join(outputRootPath, domainName, path, filename)
+					}
+					if strings.HasPrefix(source, "/") {
+						source = u + "/" + filename
+						log.Println(fullpath)
+					}
+					log.Println(fullpath)
+					if checkFileExists(fullpath) {
+						continue
+					}
+
+					if err := downloadFile(fullpath, source); err != nil {
+						log.Error("downloadFile: " + err.Error())
+						continue
+					}
+
+					exists, err := findPackage(fullpath)
+					if err != nil {
+						log.Error("findPackage: " + err.Error())
+						continue
+					}
+
+					log.Infof("exists?: %t", exists)
+					if exists {
+						log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
+						if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
+							log.Error("logToFile: " + err.Error())
+							return
+						}
+					}
 				}
 			}
 		}
-
 	}
-
 	return
-
 }
 
 // validateConfig validates the package.yml file
@@ -174,7 +181,6 @@ func (p *Package) validateConfig() error {
 		for _, d := range p.Domains {
 			if d.Name != "" && d.UrlsFile != "" && p.OutputRootPath != "" &&
 				p.InfoLog != "" && p.PackageLog != "" {
-				domainUrlFile = d.UrlsFile
 				domainName = d.Name
 				outputRootPath = p.OutputRootPath
 				infoLog = p.InfoLog
@@ -375,12 +381,12 @@ func getScriptSrc(url, method string, headers []string, insecure bool, timeout i
 	}
 
 	tr := &http.Transport{
-		ResponseHeaderTimeout: time.Duration(time.Duration(timeout) * time.Second),
+		ResponseHeaderTimeout: time.Duration(timeout) * time.Second,
 		TLSClientConfig:       &tls.Config{InsecureSkipVerify: insecure},
 	}
 
 	var client = &http.Client{
-		Timeout:   time.Duration(time.Duration(timeout) * time.Second),
+		Timeout:   time.Duration(timeout) * time.Second,
 		Transport: tr,
 	}
 
@@ -395,6 +401,7 @@ func getScriptSrc(url, method string, headers []string, insecure bool, timeout i
 		return nil, nil
 	}
 
+	// TODO: make this request concurrent
 	// Load the html document
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
