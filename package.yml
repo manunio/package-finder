@@ -1,8 +1,8 @@
 domains:
   - name: apple
-    urls_file: ./urls.txt
-#  - name: shopify
-#    urls_file:
+    urls_file: ./test-urls.txt
+  - name: shopify
+    urls_file: ./test-urls.txt
 output_root_path: out
 info_log: info.log
 package_log: package.log

@@ -48,7 +48,6 @@ type Package struct {
 
 var (
 	usr, _         = user.Current()
-	domainName     string
 	outputRootPath string
 	infoLog        string
 	packageLog     string
@@ -65,8 +64,8 @@ func init() {
 		infoLog = "info.log"
 	}
 
-	if err := loadLog(); err != nil {
-		log.Error("loadLog: " + err.Error())
+	if err := setupLog(); err != nil {
+		log.Error("setupLog: " + err.Error())
 		os.Exit(1)
 	}
 
@@ -87,80 +86,78 @@ func main() {
 		return
 	}
 
-	if p.Domains != nil {
-		for _, d := range p.Domains {
-			// read urls
-			// d.UrlsFile is already checked for nil in validateConfig at init()
-			urls, err := readFile(d.UrlsFile)
+	for _, d := range p.Domains {
+		// read urls
+		// d.UrlsFile is already checked for nil in validateConfig at init()
+		urls, err := readFile(d.UrlsFile)
+		if err != nil {
+			log.Error("readFile: " + err.Error())
+			return
+		}
+
+		// getting js source file
+		for _, u := range urls {
+			path, err := standardizeURLForDirectoryName(u)
 			if err != nil {
-				log.Error("readFile: " + err.Error())
+				log.Error("standardizeURLForDirectoryName: " + err.Error())
 				return
 			}
 
-			// getting js source file
-			for _, u := range urls {
-				path, err := standardizeURLForDirectoryName(u)
+			if err := createDirectory(path, d.Name); err != nil {
+				log.Error("createDirectory: " + err.Error())
+				return
+			}
+
+			sources, err := getScriptSrc(u, "GET", nil, true, 10)
+			if err != nil {
+				log.Error("getScriptSrc: " + err.Error())
+			}
+
+			for _, source := range sources {
+				log.Info(source)
+				filenameURL, err := url.Parse(source)
 				if err != nil {
-					log.Error("standardizeURLForDirectoryName: " + err.Error())
-					return
+					log.Error("url.Parse: " + err.Error())
 				}
 
-				if err := createDirectory(path); err != nil {
-					log.Error("createDirectory: " + err.Error())
-					return
+				if filenameURL == nil {
+					continue
 				}
 
-				sources, err := getScriptSrc(u, "GET", nil, true, 10)
+				filename := pa.Base(filenameURL.Path)
+				if filename == "." {
+					continue
+				}
+
+				fullpath := filepath.Join(outputRootPath, d.Name, path, filename)
+				if strings.HasPrefix(source, "/") {
+					source = u + "/" + filename
+				}
+				log.Info(fullpath)
+
+				if checkFileExists(fullpath) {
+					continue
+				}
+
+				if err := downloadFile(fullpath, source); err != nil {
+					log.Error("downloadFile: " + err.Error())
+					continue
+				}
+
+				exists, err := findPackage(fullpath)
 				if err != nil {
-					log.Error("getScriptSrc: " + err.Error())
+					log.Error("findPackage: " + err.Error())
+					continue
 				}
 
-				for _, source := range sources {
-					log.Println(source)
-					filenameURL, err := url.Parse(source)
-					if err != nil {
-						log.Error("url.Parse: " + err.Error())
-					}
-
-					if filenameURL == nil {
-						continue
-					}
-
-					filename := pa.Base(filenameURL.Path)
-					if filename == "." {
-						continue
-					}
-					var fullpath string
-					if domainName != "" {
-						fullpath = filepath.Join(outputRootPath, domainName, path, filename)
-					}
-					if strings.HasPrefix(source, "/") {
-						source = u + "/" + filename
-						log.Println(fullpath)
-					}
-					log.Println(fullpath)
-					if checkFileExists(fullpath) {
-						continue
-					}
-
-					if err := downloadFile(fullpath, source); err != nil {
-						log.Error("downloadFile: " + err.Error())
-						continue
-					}
-
-					exists, err := findPackage(fullpath)
-					if err != nil {
-						log.Error("findPackage: " + err.Error())
-						continue
-					}
-
-					log.Infof("exists?: %t", exists)
-					if exists {
-						log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
-						if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
-							log.Error("logToFile: " + err.Error())
-							return
-						}
+				log.Infof("package exists?: %t", exists)
+				if exists {
+					log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
+					if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
+						log.Error("logToFile: " + err.Error())
+						// we return here as this part fails to log,
+						// most crucial part of this program.
+						return
 					}
 				}
 			}
@@ -169,9 +166,9 @@ func main() {
 	return
 }
 
-// loadLog initializes logger file handler, text formatter,
+// setupLog initializes logger file handler, text formatter,
 // with MultiWriter for both stdout and file.
-func loadLog() error {
+func setupLog() error {
 	f, err := os.OpenFile(infoLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 	Formatter := new(log.TextFormatter)
 	Formatter.FullTimestamp = true
@@ -194,7 +191,6 @@ func (p *Package) validateConfig() error {
 		for _, d := range p.Domains {
 			if d.Name != "" && d.UrlsFile != "" && p.OutputRootPath != "" &&
 				p.InfoLog != "" && p.PackageLog != "" {
-				domainName = d.Name
 				outputRootPath = p.OutputRootPath
 				packageLog = p.PackageLog
 			} else {
@@ -326,7 +322,7 @@ func standardizeURLForDirectoryName(link string) (string, error) {
 
 // createDirectory for creating directory based on provided name,
 // in our case its url name
-func createDirectory(path string) error {
+func createDirectory(path, domainName string) error {
 	// create an out directory if it doesn't already exists
 	var outputDirectory string
 	if domainName != "" {
