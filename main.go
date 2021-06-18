@@ -24,7 +24,7 @@ import (
 )
 
 // TODO: reduce global variables
-// TODO: make goquery request concurrent
+// TODO: make goquery & download requests concurrent
 // TODO: handle error defer *.Close() methods
 
 // package-finder downloads all javascript files from the given url,
@@ -56,34 +56,17 @@ var (
 )
 
 func init() {
-	f, err := os.OpenFile(infoLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
-	Formatter := new(log.TextFormatter)
-	Formatter.FullTimestamp = true
-	log.SetFormatter(Formatter)
-	// writes to file and stdout
-	mw := io.MultiWriter(os.Stdout, f)
-	if err != nil {
-		// Cannot open log file. Logging to stderr
-		fmt.Println(err)
-	} else {
-		log.SetOutput(mw)
-	}
 
 	if os.Getenv("MODE") == "prod" {
 		packageYml = filepath.Join(usr.HomeDir, "package.yml")
+		infoLog = filepath.Join("/var/log/info.log")
 	} else {
 		packageYml = "package.yml"
+		infoLog = "info.log"
 	}
 
-	p := Package{}
-
-	if err := p.readConfig(); err != nil {
-		log.Error("readConfig: " + err.Error())
-		os.Exit(1)
-	}
-
-	if err := p.validateConfig(); err != nil {
-		log.Error("validateConfig: " + err.Error())
+	if err := loadLog(); err != nil {
+		log.Error("loadLog: " + err.Error())
 		os.Exit(1)
 	}
 
@@ -93,6 +76,17 @@ func main() {
 	log.Println("Starting service..")
 
 	p := Package{}
+
+	if err := p.readConfig(); err != nil {
+		log.Error("readConfig: " + err.Error())
+		return
+	}
+
+	if err := p.validateConfig(); err != nil {
+		log.Error("validateConfig: " + err.Error())
+		return
+	}
+
 	if p.Domains != nil {
 		for _, d := range p.Domains {
 			// read urls
@@ -175,6 +169,25 @@ func main() {
 	return
 }
 
+// loadLog initializes logger file handler, text formatter,
+// with MultiWriter for both stdout and file.
+func loadLog() error {
+	f, err := os.OpenFile(infoLog, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
+	Formatter := new(log.TextFormatter)
+	Formatter.FullTimestamp = true
+	log.SetFormatter(Formatter)
+	// writes to file and stdout
+	mw := io.MultiWriter(os.Stdout, f)
+	if err != nil {
+		// Cannot open log file. Logging to stderr
+		fmt.Println(err)
+		return err
+	} else {
+		log.SetOutput(mw)
+	}
+	return nil
+}
+
 // validateConfig validates the package.yml file
 func (p *Package) validateConfig() error {
 	if p.Domains != nil {
@@ -183,7 +196,6 @@ func (p *Package) validateConfig() error {
 				p.InfoLog != "" && p.PackageLog != "" {
 				domainName = d.Name
 				outputRootPath = p.OutputRootPath
-				infoLog = p.InfoLog
 				packageLog = p.PackageLog
 			} else {
 				return errors.New("package.yml required fields not set")
