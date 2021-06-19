@@ -35,7 +35,7 @@ import (
 type Domain struct {
 	Name     string `yaml:"name"`
 	UrlsFile string `yaml:"urls_file"`
-	Enable     bool   `yaml:"enable"`
+	Enable   bool   `yaml:"enable"`
 }
 
 type Package struct {
@@ -119,7 +119,7 @@ func main() {
 			}
 
 			for _, source := range sources {
-				log.Info(source)
+				log.Info("url: " + source)
 				filenameURL, err := url.Parse(source)
 				if err != nil {
 					log.Error("url.Parse: " + err.Error())
@@ -138,7 +138,8 @@ func main() {
 				if strings.HasPrefix(source, "/") {
 					source = u + "/" + filename
 				}
-				log.Info(fullpath)
+
+				log.Info("file: " + fullpath)
 
 				if checkFileExists(fullpath) {
 					continue
@@ -155,7 +156,7 @@ func main() {
 					continue
 				}
 
-				log.Infof("package exists?: %t", exists)
+				log.Infof("package exists?: %t file: %s", exists, fullpath)
 				if exists {
 					log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
 					if err := logToFile("host: " + d.Name + " url: " + u + " path: " + fullpath + "\n"); err != nil {
