@@ -35,6 +35,7 @@ import (
 type Domain struct {
 	Name     string `yaml:"name"`
 	UrlsFile string `yaml:"urls_file"`
+	Enable     bool   `yaml:"enable"`
 }
 
 type Package struct {
@@ -87,6 +88,10 @@ func main() {
 	}
 
 	for _, d := range p.Domains {
+
+		if !d.Enable {
+			continue
+		}
 		// read urls
 		// d.UrlsFile is already checked for nil in validateConfig at init()
 		urls, err := readFile(d.UrlsFile)
@@ -153,10 +158,10 @@ func main() {
 				log.Infof("package exists?: %t", exists)
 				if exists {
 					log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
-					if err := logToFile("url: " + u + "path: " + fullpath + "\n"); err != nil {
+					if err := logToFile("host: " + d.Name + " url: " + u + " path: " + fullpath + "\n"); err != nil {
 						log.Error("logToFile: " + err.Error())
-						// we return here as this part fails to log,
-						// most crucial part of this program.
+						// we return here, as this part fails to log,
+						// the most crucial information of this program.
 						return
 					}
 				}
