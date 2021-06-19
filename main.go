@@ -56,7 +56,7 @@ var (
 
 func init() {
 
-	if os.Getenv("MODE") == "prod" {
+	if os.Getenv("ENV") == "prod" {
 		packageYml = filepath.Join(usr.HomeDir, "package.yml")
 		infoLog = filepath.Join("/var/log/info.log")
 	} else {
@@ -153,7 +153,7 @@ func main() {
 				log.Infof("package exists?: %t", exists)
 				if exists {
 					log.Infof("log: %s ", "url: "+u+"path: "+fullpath)
-					if err := logToFile("url: " + u + "path: " + fullpath); err != nil {
+					if err := logToFile("url: " + u + "path: " + fullpath + "\n"); err != nil {
 						log.Error("logToFile: " + err.Error())
 						// we return here as this part fails to log,
 						// most crucial part of this program.
@@ -230,14 +230,16 @@ func (p *Package) readConfig() error {
 // and then logs the given message
 func logToFile(message string) error {
 	// create a log file
-	f, err := os.OpenFile(packageLog, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	f, err := os.OpenFile(packageLog, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	log.SetOutput(f)
-	log.Info(message)
+	if _, err = f.WriteString(message); err != nil {
+		return err
+	}
+
 	return nil
 }
 

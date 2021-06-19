@@ -1,8 +1,12 @@
 domains:
-  - name: apple
-    urls_file: ./test-urls.txt
-  - name: shopify
-    urls_file: ./test-urls.txt
+  - name: shopifycloud
+    urls_file: ./shopifycloud-urls.txt
+    #- name: paypal
+    #urls_file: ./paypal-urls.txt
+#  - name: apple
+#    urls_file: ./test-urls.txt
+#  - name: shopify
+#    urls_file: ./test-urls.txt
 output_root_path: out
 info_log: info.log
 package_log: package.log
