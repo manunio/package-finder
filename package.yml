@@ -1,22 +1,36 @@
 domains:
+  - name: github
+    urls_file: ./github-urls.txt
+    enable: true
+
+  - name: apple-corp
+    urls_file: ./apple-corp-urls.txt
+    enable: false
+
   - name: gitlab
     urls_file: ./gitlab-urls.txt
     enable: false
+
   - name: shopify
     urls_file: ./shopify-urls.txt
     enable: false
+
   - name: shopifycloud
     urls_file: ./shopifycloud-urls.txt
     enable: false
+
   - name: paypal
     urls_file: ./paypal-urls.txt
     enable: false
+
   - name: apple
     urls_file: ./test-urls.txt
     enable: false
+
   - name: shopify
     urls_file: ./test-urls.txt
     enable: false
+
 output_root_path: out
 info_log: info.log
 package_log: package.log
