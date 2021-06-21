@@ -60,6 +60,9 @@ func init() {
 	if os.Getenv("ENV") == "prod" {
 		packageYml = filepath.Join(usr.HomeDir, "package.yml")
 		infoLog = filepath.Join("/var/log/info.log")
+	} else if os.Getenv("ENV") == "test" {
+		packageYml = ""
+		infoLog = ""
 	} else {
 		packageYml = "package.yml"
 		infoLog = "info.log"
