@@ -32,12 +32,14 @@ import (
 // in our case it searches for "scripts:" in file and then logs useful details to a package.log
 // in-case its found.
 
+// Domain represents an element of package.yml list
 type Domain struct {
 	Name     string `yaml:"name"`
 	UrlsFile string `yaml:"urls_file"`
 	Enable   bool   `yaml:"enable"`
 }
 
+// Package represents package.yml
 type Package struct {
 	Domains        []Domain `yaml:"domains"`
 	OutputRootPath string   `yaml:"output_root_path"`
@@ -188,9 +190,8 @@ func setupLog() error {
 		// Cannot open log file. Logging to stderr
 		fmt.Println(err)
 		return err
-	} else {
-		log.SetOutput(mw)
 	}
+	log.SetOutput(mw)
 	return nil
 }
 
@@ -258,9 +259,9 @@ func findPackage(path string) (bool, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
-		} else {
-			return false, err
 		}
+		return false, err
+
 	}
 	defer f.Close()
 
@@ -352,9 +353,9 @@ func createDirectory(path, domainName string) error {
 	if err := os.Mkdir(hostSubDir, 0755); err != nil {
 		if os.IsExist(err) {
 			return nil
-		} else {
-			return err
 		}
+		return err
+
 	}
 
 	return nil
