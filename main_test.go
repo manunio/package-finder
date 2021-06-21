@@ -13,12 +13,6 @@ func TestReadConfig(t *testing.T) {
 		t.Error(err)
 	}
 
-	// get []byte for test_package.yml
-	// f, err := ioutil.ReadFile("test_package.yml")
-	// if err != nil {
-	// 	t.Error(err)
-	// }
-
 	testPackage := &Package{
 		Domains:        []Domain{{Name: "github", UrlsFile: "./urls/github-urls.txt", Enable: true}},
 		OutputRootPath: "out",
@@ -33,8 +27,8 @@ func TestReadConfig(t *testing.T) {
 		fails  bool
 	}{
 		"fails on missing package.yml path": {
-			input:  &Package{PackageYml: ""},
-			output: &Package{PackageYml: ""},
+			input:  &Package{PackageYml: "", PackageLog: ""},
+			output: &Package{PackageYml: "", PackageLog: ""},
 			fails:  true,
 		},
 		"passes on package.yml path & marshal": {
@@ -54,6 +48,52 @@ func TestReadConfig(t *testing.T) {
 	}
 }
 
-// func TestValidateConfig(t * testing.T) error {
-//
-// }
+func TestValidateConfig(t *testing.T) {
+
+	// set test environment
+	if err := os.Setenv("ENV", "test"); err != nil {
+		t.Error(err)
+	}
+
+	pWithoutFields := &Package{
+		Domains:        []Domain{{Name: "", UrlsFile: "", Enable: true}},
+		PackageYml:     "test_package.yml",
+		InfoLog:        "",
+		PackageLog:     "test_package.log",
+		OutputRootPath: "",
+	}
+
+	pWithFields := &Package{
+		Domains:        []Domain{{Name: "github", UrlsFile: "./urls/github-urls.txt", Enable: true}},
+		OutputRootPath: "out",
+		InfoLog:        "test_info.log",
+		PackageLog:     "test_package.log",
+		PackageYml:     "test_package.yml",
+	}
+	tests := map[string]struct {
+		input  *Package
+		output *Package
+		fails  bool
+	}{
+		"fails on missing required fields": {
+			input:  pWithoutFields,
+			output: pWithoutFields,
+			fails:  true,
+		},
+		"passes on all required fields": {
+			input:  pWithFields,
+			output: pWithFields,
+			fails:  false,
+		},
+	}
+	for _, test := range tests {
+		err := test.input.validateConfig()
+		if test.fails {
+			assert.NotNil(t, err)
+		} else {
+			assert.Nil(t, err)
+		}
+		assert.Equal(t, test.output, test.input)
+	}
+
+}

@@ -217,8 +217,8 @@ func (p *Package) validateConfig() error {
 func (p *Package) readConfig() error {
 	// ReadFile following statement is useful for reading small files,
 	// 	don't use it for reading large files
-	if p.PackageYml == "" {
-		return errors.New("package.yml path not set")
+	if p.PackageYml == "" && p.PackageLog == "" {
+		return errors.New("package.yml and package.log path not set")
 	}
 	packageYml = p.PackageYml
 	b, err := ioutil.ReadFile(packageYml)
