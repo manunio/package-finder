@@ -46,7 +46,6 @@ type Package struct {
 	InfoLog        string   `yaml:"info_log"`
 	PackageLog     string   `yaml:"package_log"`
 	PackageYml     string   `yaml:"package_yml"`
-	ConfigFile     []byte
 }
 
 var (
@@ -63,8 +62,8 @@ func init() {
 		packageYml = filepath.Join(usr.HomeDir, "package.yml")
 		infoLog = filepath.Join("/var/log/info.log")
 	} else if os.Getenv("ENV") == "test" {
-		packageYml = ""
-		infoLog = ""
+		packageYml = "test_package.yml"
+		infoLog = "test_info.log"
 	} else {
 		packageYml = "package.yml"
 		infoLog = "info.log"
@@ -218,21 +217,17 @@ func (p *Package) validateConfig() error {
 func (p *Package) readConfig() error {
 	// ReadFile following statement is useful for reading small files,
 	// 	don't use it for reading large files
-	if p.PackageYml != "" {
-		packageYml = p.PackageYml
+	if p.PackageYml == "" {
+		return errors.New("package.yml path not set")
 	}
+	packageYml = p.PackageYml
 	b, err := ioutil.ReadFile(packageYml)
 	if err != nil {
 		return err
 	}
-	p.ConfigFile = b
-
-	if p.ConfigFile != nil {
-		if err := yaml.Unmarshal(p.ConfigFile, p); err != nil {
-			return err
-		}
+	if err := yaml.Unmarshal(b, p); err != nil {
+		return err
 	}
-
 	return nil
 }
 
