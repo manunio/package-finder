@@ -32,19 +32,20 @@ import (
 // in our case it searches for "scripts:" in file and then logs useful details to a package.log
 // in-case its found.
 
+// Domain represents an element of package.yml list
 type Domain struct {
 	Name     string `yaml:"name"`
 	UrlsFile string `yaml:"urls_file"`
 	Enable   bool   `yaml:"enable"`
 }
 
+// Package represents package.yml
 type Package struct {
 	Domains        []Domain `yaml:"domains"`
 	OutputRootPath string   `yaml:"output_root_path"`
 	InfoLog        string   `yaml:"info_log"`
 	PackageLog     string   `yaml:"package_log"`
 	PackageYml     string   `yaml:"package_yml"`
-	ConfigFile     []byte
 }
 
 var (
@@ -60,6 +61,9 @@ func init() {
 	if os.Getenv("ENV") == "prod" {
 		packageYml = filepath.Join(usr.HomeDir, "package.yml")
 		infoLog = filepath.Join("/var/log/info.log")
+	} else if os.Getenv("ENV") == "test" {
+		packageYml = "test_package.yml"
+		infoLog = "test_info.log"
 	} else {
 		packageYml = "package.yml"
 		infoLog = "info.log"
@@ -185,9 +189,8 @@ func setupLog() error {
 		// Cannot open log file. Logging to stderr
 		fmt.Println(err)
 		return err
-	} else {
-		log.SetOutput(mw)
 	}
+	log.SetOutput(mw)
 	return nil
 }
 
@@ -214,21 +217,17 @@ func (p *Package) validateConfig() error {
 func (p *Package) readConfig() error {
 	// ReadFile following statement is useful for reading small files,
 	// 	don't use it for reading large files
-	if p.PackageYml != "" {
-		packageYml = p.PackageYml
+	if p.PackageYml == "" {
+		return errors.New("package.yml path not set")
 	}
+	packageYml = p.PackageYml
 	b, err := ioutil.ReadFile(packageYml)
 	if err != nil {
 		return err
 	}
-	p.ConfigFile = b
-
-	if p.ConfigFile != nil {
-		if err := yaml.Unmarshal(p.ConfigFile, p); err != nil {
-			return err
-		}
+	if err := yaml.Unmarshal(b, p); err != nil {
+		return err
 	}
-
 	return nil
 }
 
@@ -255,9 +254,9 @@ func findPackage(path string) (bool, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
-		} else {
-			return false, err
 		}
+		return false, err
+
 	}
 	defer f.Close()
 
@@ -349,9 +348,9 @@ func createDirectory(path, domainName string) error {
 	if err := os.Mkdir(hostSubDir, 0755); err != nil {
 		if os.IsExist(err) {
 			return nil
-		} else {
-			return err
 		}
+		return err
+
 	}
 
 	return nil

@@ -1,0 +1,8 @@
+domains:
+  - name: github
+    urls_file: ./urls/github-urls.txt
+    enable: true
+output_root_path: out
+info_log: test_info.log
+package_log: test_package.log
+package_yml: test_package.yml
